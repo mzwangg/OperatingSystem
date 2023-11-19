@@ -194,7 +194,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) { //完成�
     proc->parent=current; //更新创建proc的parent父线程变量为当前线程
 
     if(setup_kstack(proc)!=0){  //调用setup_kstack分配并初始化内核栈
-        goto bad_fork_cleanup_kstack;
+        goto bad_fork_cleanup_proc;
     }
 
     if (copy_mm(clone_flags, proc) != 0) { //调用copy_mm根据 clone_flags 决定是复制还是共享内存管理系统
@@ -219,10 +219,10 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) { //完成�
 fork_out:   //调用alloc_proc出错的处理
     return ret;
 
-bad_fork_cleanup_kstack: //调用setup_kstack出错时的处理
+bad_fork_cleanup_kstack: //调用copy_mm出错时的处理
     put_kstack(proc);  //释放分配的内核栈空间
 
-bad_fork_cleanup_proc: //调用copy_mm出错时的处理
+bad_fork_cleanup_proc: //调用setup_kstack出错时的处理
     kfree(proc);
     goto fork_out;
 }
@@ -232,8 +232,8 @@ bad_fork_cleanup_proc: //调用copy_mm出错时的处理
 
 - 调用 `alloc_proc` 函数为即将要创建的进程 proc 分配一个 `proc_struct` 结构体并进行初始化，如果分配失败则跳转至 `fork_out` 返回 ret；
 - `proc->parent=current` 将当前进程设为创建进程 proc 的父进程；
-- 调用 `setup_kstack()` 函数分配一个 `KSTACKPAGE = 8KB` 大小的内核栈并初始化，失败则跳转至 `bad_fork_cleanup_kstack` ，执行 `put_kstack(proc)`释放分配的内核栈空间；
-- 调用 `copy_mm` 根据 `clone_flags` 决定是复制还是共享内存管理系统，失败则跳转至 `bad_fork_cleanup_proc` ， `kfree` 释放进程 proc 进程空间，并跳转至 `fork_out` 返回 ret；
+- 调用 `setup_kstack()` 函数分配一个 `KSTACKPAGE = 8KB` 大小的内核栈并初始化，失败则跳转至 `bad_fork_cleanup_proc` ， `kfree` 释放进程 proc 进程空间，并跳转至 `fork_out` 返回 ret；
+- 调用 `copy_mm` 根据 `clone_flags` 决定是复制还是共享内存管理系统，失败则跳转至 `bad_fork_cleanup_kstack` ，执行 `put_kstack(proc)`释放分配的内核栈空间；
 - `copy_thread()` 函数设置进程的中断帧和上下文；
 - `local_intr_save(intr_flag)` 设置为禁用中断，保证在修改全局数据结构时不会被打断，然后调用 `get_pid()` 函数为创建的进程 proc 分配一个 pid 号，接着调用 `hash_proc()` 函数以及 `list_add()` 函数分别将设置好的 proc_struct 结构体 proc 加入 `hash_list` 哈希链表和 `proc_list` 双向链表中，同时将进程块数量 `nr_process `加 1, `local_intr_restore(intr_flag)` 恢复为使能中断状态；
 - `wakeup_proc(proc)` 函数设置 `proc->state` 的值为 `PROC_RUNNABLE` ，将创建线程设置为就绪状态；
