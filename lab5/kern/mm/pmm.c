@@ -366,9 +366,9 @@ int copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end,
             // get page from ptep
             struct Page *page = pte2page(*ptep);
             // alloc a page for process B
-            struct Page *npage = alloc_page();
+            // struct Page *npage = alloc_page();
             assert(page != NULL);
-            assert(npage != NULL);
+            // assert(npage != NULL);
             int ret = 0;
             /* LAB5:EXERCISE2 YOUR CODE
              * replicate content of page to npage, build the map of phy addr of
@@ -389,6 +389,23 @@ int copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end,
              * (4) build the map of phy addr of  nage with the linear addr start
              */
 
+            if(share){//如果COW机制启用
+                cprintf("Sharing the page 0x%x\n", page2kva(page));
+                // 将父进程对应物理页面的pte改为只读
+                page_insert(from, page, start, perm & ~PTE_W);
+                // 将子进程虚拟地址映射到父进程对应的物理页，并将pte改为只读
+                ret = page_insert(to, page, start, perm & ~PTE_W);
+            } else {//完整拷贝内存
+                // 申请一个新页
+                struct Page *npage = alloc_page();
+                assert(npage!=NULL);
+                cprintf("alloc a new page 0x%x\n", page2kva(npage));
+
+                void* src_kvaddr = page2kva(page);//父进程对应物理页的内核虚拟地址
+                void* dst_kvaddr = page2kva(npage); //子进程对应物理页的内核虚拟地址
+                memcpy(dst_kvaddr, src_kvaddr, PGSIZE);//复制
+                ret = page_insert(to, npage, start, perm);//在子进程将该虚拟地址映射到对应的物理页
+            }
 
             assert(ret == 0);
         }

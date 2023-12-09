@@ -201,7 +201,7 @@ dup_mmap(struct mm_struct *to, struct mm_struct *from) {
 
         insert_vma_struct(to, nvma);
 
-        bool share = 0;
+        bool share = 1;
         if (copy_range(to->pgdir, from->pgdir, vma->vm_start, vma->vm_end, share) != 0) {
             return -E_NO_MEM;
         }
@@ -447,22 +447,47 @@ do_pgfault(struct mm_struct *mm, uint_t error_code, uintptr_t addr) {
         *    page_insert ： 建立一个Page的phy addr与线性addr la的映射
         *    swap_map_swappable ： 设置页面可交换
         */
-        if (swap_init_ok) {
-            struct Page *page = NULL;
-            // 你要编写的内容在这里，请基于上文说明以及下文的英文注释完成代码编写
-            //(1）According to the mm AND addr, try
-            //to load the content of right disk page
-            //into the memory which page managed.
-            //(2) According to the mm,
-            //addr AND page, setup the
-            //map of phy addr <--->
-            //logical addr
-            //(3) make the page swappable.
-            page->pra_vaddr = addr;
+
+        if (*ptep & PTE_V) {
+            cprintf("\n\nCOW: ptep 0x%x, pte 0x%x\n",ptep, *ptep);
+            struct Page* page = pte2page(*ptep);//获取对应物理页
+            if(page_ref(page) > 1)
+            {
+                // 如果该物理页面被多个进程引用
+                // 则使用pgdir_alloc_page分配一个新物理页，该函数会自动将page_ref(page)减一
+                struct Page* new_page = pgdir_alloc_page(mm->pgdir, addr, perm);
+                void * src_kva = page2kva(page);//原页面的内核虚拟地址
+                void * dst_kva = page2kva(new_page);//新页面的内核虚拟地址
+                memcpy(dst_kva, src_kva, PGSIZE);//复制
+            } else {
+                //如果该物理页面被一个进程引用，则说明是共享页面的最后一页
+                //根据所处的vma恢复其权限perm
+                page_insert(mm->pgdir, page, addr, perm);
+            }
         } else {
-            cprintf("no swap_init_ok but ptep is %x, failed\n", *ptep);
-            goto failed;
+            if (swap_init_ok) {
+                struct Page *page = NULL;
+                // 你要编写的内容在这里，请基于上文说明以及下文的英文注释完成代码编写
+                //(1）According to the mm AND addr, try
+                //to load the content of right disk page
+                //into the memory which page managed.
+                //(2) According to the mm,
+                //addr AND page, setup the
+                //map of phy addr <--->
+                //logical addr
+                //(3) make the page swappable.
+
+                swap_in(mm, addr, &page);
+                page_insert(mm->pgdir, page, addr, perm);
+                swap_map_swappable(mm, addr, page, 1);
+
+                page->pra_vaddr = addr;
+            } else {
+                cprintf("no swap_init_ok but ptep is %x, failed\n", *ptep);
+                goto failed;
+            }
         }
+
    }
    ret = 0;
 failed:
