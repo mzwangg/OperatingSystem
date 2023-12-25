@@ -474,12 +474,15 @@ do_pgfault(struct mm_struct *mm, uint_t error_code, uintptr_t addr) {
             //map of phy addr <--->
             //logical addr
             //(3) make the page swappable.
-            /*if ((ret = swap_in(mm, addr, &page)) != 0) {
+
+            // 分配一个内存页，将addr线性地址对应的物理页数据从磁盘交换到物理内存中(令Page指针指向交换成功后的物理页)
+            if ((ret = swap_in(mm, addr, &page)) != 0) {
                 cprintf("swap_in in do_pgfault failed\n");
                 goto failed;
             }    
+            // 将交换进来的page页与mm->padir页表中对应addr的二级页表项建立映射关系(perm标识这个二级页表的各个权限位)
             page_insert(mm->pgdir, page, addr, perm);
-            swap_map_swappable(mm, addr, page, 1);*/
+            swap_map_swappable(mm, addr, page, 1); //设置页面可交换
 
             page->pra_vaddr = addr;
         } else {

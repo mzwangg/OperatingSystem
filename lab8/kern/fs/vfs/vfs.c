@@ -26,7 +26,7 @@ __alloc_fs(int type) {
 void
 vfs_init(void) {
     sem_init(&bootfs_sem, 1);
-    vfs_devlist_init();
+    vfs_devlist_init();  //建立了一个device list双向链表vdev_list
 }
 
 // lock_bootfs - lock  for bootfs

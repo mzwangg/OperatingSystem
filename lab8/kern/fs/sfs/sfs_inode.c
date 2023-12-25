@@ -501,7 +501,7 @@ sfs_lookup_once(struct sfs_fs *sfs, struct sfs_inode *sin, const char *name, str
     uint32_t ino;
     lock_sin(sin);
     {   // find the NO. of disk block and logical index of file entry
-        ret = sfs_dirent_search_nolock(sfs, sin, name, &ino, slot, NULL);
+        ret = sfs_dirent_search_nolock(sfs, sin, name, &ino, slot, NULL);  //查找与路径名匹配的目录项
     }
     unlock_sin(sin);
     if (ret == 0) {
@@ -576,7 +576,7 @@ sfs_io_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, void *buf, off_t offset
 
     int (*sfs_buf_op)(struct sfs_fs *sfs, void *buf, size_t len, uint32_t blkno, off_t offset);
     int (*sfs_block_op)(struct sfs_fs *sfs, void *buf, uint32_t blkno, uint32_t nblks);
-    if (write) {
+    if (write) {   //设置读取的函数操作
         sfs_buf_op = sfs_wbuf, sfs_block_op = sfs_wblock;
     }
     else {
@@ -599,7 +599,42 @@ sfs_io_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, void *buf, off_t offset
      * (3) If end position isn't aligned with the last block, Rd/Wr some content from begin to the (endpos % SFS_BLKSIZE) of the last block
 	 *       NOTICE: useful function: sfs_bmap_load_nolock, sfs_buf_op	
 	*/
+    if ((blkoff = offset % SFS_BLKSIZE) != 0) {
+        size = (nblks != 0) ? (SFS_BLKSIZE - blkoff) : (endpos - offset);
+        if ((ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino)) != 0) {
+            goto out;
+        }
+        if ((ret = sfs_buf_op(sfs, buf, size, ino, blkoff)) != 0) {
+            goto out;
+        }
+        alen += size;
+        if (nblks == 0) {
+            goto out;
+        }
+        buf += size, blkno ++, nblks --;
+    }
 
+    size = SFS_BLKSIZE;
+    
+    while (nblks != 0) {
+        if ((ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino)) != 0) {
+            goto out;
+        }
+        if ((ret = sfs_block_op(sfs, buf, ino, 1)) != 0) {
+            goto out;
+        }
+        alen += size, buf += size, blkno ++, nblks --;
+    }
+
+    if ((size = endpos % SFS_BLKSIZE) != 0) {
+        if ((ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino)) != 0) {
+            goto out;
+        }
+        if ((ret = sfs_buf_op(sfs, buf, size, ino, 0)) != 0) {
+            goto out;
+        }
+        alen += size;
+    }
     
 
 out:
@@ -617,15 +652,15 @@ out:
  */
 static inline int
 sfs_io(struct inode *node, struct iobuf *iob, bool write) {
-    struct sfs_fs *sfs = fsop_info(vop_fs(node), sfs);
+    struct sfs_fs *sfs = fsop_info(vop_fs(node), sfs);  //inode对应的sfs和sin
     struct sfs_inode *sin = vop_info(node, sfs_inode);
     int ret;
     lock_sin(sin);
     {
         size_t alen = iob->io_resid;
-        ret = sfs_io_nolock(sfs, sin, iob->io_base, iob->io_offset, &alen, write);
+        ret = sfs_io_nolock(sfs, sin, iob->io_base, iob->io_offset, &alen, write);  //读文件操作
         if (alen != 0) {
-            iobuf_skip(iob, alen);
+            iobuf_skip(iob, alen);  //调整iobuf的指针
         }
     }
     unlock_sin(sin);
@@ -635,7 +670,7 @@ sfs_io(struct inode *node, struct iobuf *iob, bool write) {
 // sfs_read - read file
 static int
 sfs_read(struct inode *node, struct iobuf *iob) {
-    return sfs_io(node, iob, 0);
+    return sfs_io(node, iob, 0);  //0表示读
 }
 
 // sfs_write - write file
@@ -940,7 +975,7 @@ out_unlock:
  *              refers to.
  */
 static int
-sfs_lookup(struct inode *node, char *path, struct inode **node_store) {
+sfs_lookup(struct inode *node, char *path, struct inode **node_store) {  //分解path获得各个子目录，最终文件对应的inode
     struct sfs_fs *sfs = fsop_info(vop_fs(node), sfs);
     assert(*path != '\0' && *path != '/');
     vop_ref_inc(node);
@@ -950,7 +985,7 @@ sfs_lookup(struct inode *node, char *path, struct inode **node_store) {
         return -E_NOTDIR;
     }
     struct inode *subnode;
-    int ret = sfs_lookup_once(sfs, sin, path, &subnode, NULL);
+    int ret = sfs_lookup_once(sfs, sin, path, &subnode, NULL); //查找对应的inode节点
 
     vop_ref_dec(node);
     if (ret != 0) {

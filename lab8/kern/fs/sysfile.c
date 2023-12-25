@@ -45,7 +45,7 @@ sysfile_open(const char *__path, uint32_t open_flags) {
     if ((ret = copy_path(&path, __path)) != 0) {
         return ret;
     }
-    ret = file_open(path, open_flags);
+    ret = file_open(path, open_flags);  //调用file_open
     kfree(path);
     return ret;
 }
@@ -58,30 +58,30 @@ sysfile_close(int fd) {
 
 /* sysfile_read - read file */
 int
-sysfile_read(int fd, void *base, size_t len) {
+sysfile_read(int fd, void *base, size_t len) {  //文件系统抽象层的read
     struct mm_struct *mm = current->mm;
-    if (len == 0) {
+    if (len == 0) {  //判断长度
         return 0;
     }
-    if (!file_testfd(fd, 1, 0)) {
+    if (!file_testfd(fd, 1, 0)) {  //检查文件是否可读
         return -E_INVAL;
     }
     void *buffer;
-    if ((buffer = kmalloc(IOBUF_SIZE)) == NULL) {
+    if ((buffer = kmalloc(IOBUF_SIZE)) == NULL) {  //分配buffer空间
         return -E_NO_MEM;
     }
 
     int ret = 0;
     size_t copied = 0, alen;
-    while (len != 0) {
+    while (len != 0) {   //while循环读取
         if ((alen = IOBUF_SIZE) > len) {
             alen = len;
         }
-        ret = file_read(fd, buffer, alen, &alen);
+        ret = file_read(fd, buffer, alen, &alen);  //读内容到buffer
         if (alen != 0) {
             lock_mm(mm);
             {
-                if (copy_to_user(mm, base, buffer, alen)) {
+                if (copy_to_user(mm, base, buffer, alen)) {  //将读到的内容复制到用户空间
                     assert(len >= alen);
                     base += alen, len -= alen, copied += alen;
                 }

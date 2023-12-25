@@ -69,14 +69,14 @@ get_device(char *path, char **subpath, struct inode **node_store) {
  * vfs_lookup - get the inode according to the path filename
  */
 int
-vfs_lookup(char *path, struct inode **node_store) {
+vfs_lookup(char *path, struct inode **node_store) {  //根据path找到指定路径下的目录下的文件
     int ret;
     struct inode *node;
-    if ((ret = get_device(path, &path, &node)) != 0) {
+    if ((ret = get_device(path, &path, &node)) != 0) {  //获取设备
         return ret;
     }
     if (*path != '\0') {
-        ret = vop_lookup(node, path, node_store);
+        ret = vop_lookup(node, path, node_store);  //调用vop_lookup函数来找到根目录下对应的索引节点，是sys_lookup
         vop_ref_dec(node);
         return ret;
     }

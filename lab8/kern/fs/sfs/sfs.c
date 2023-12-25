@@ -12,7 +12,7 @@
 void
 sfs_init(void) {
     int ret;
-    if ((ret = sfs_mount("disk0")) != 0) {
+    if ((ret = sfs_mount("disk0")) != 0) {  //完成对Simple FS的初始化工作，并把此实例文件系统挂在虚拟文件系统中
         panic("failed: sfs: sfs_mount: %e.\n", ret);
     }
 }

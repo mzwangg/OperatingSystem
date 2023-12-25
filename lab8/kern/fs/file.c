@@ -154,7 +154,7 @@ file_testfd(int fd, bool readable, bool writable) {
 
 // open file
 int
-file_open(char *path, uint32_t open_flags) {
+file_open(char *path, uint32_t open_flags) {  //进入文件系统抽象层
     bool readable = 0, writable = 0;
     switch (open_flags & O_ACCMODE) {
     case O_RDONLY: readable = 1; break;
@@ -166,12 +166,12 @@ file_open(char *path, uint32_t open_flags) {
         return -E_INVAL;
     }
     int ret;
-    struct file *file;
-    if ((ret = fd_array_alloc(NO_FD, &file)) != 0) {
+    struct file *file;  //给即将打开的文件分配一个file数据结构变量
+    if ((ret = fd_array_alloc(NO_FD, &file)) != 0) {  //分配
         return ret;
     }
     struct inode *node;
-    if ((ret = vfs_open(path, open_flags, &node)) != 0) {
+    if ((ret = vfs_open(path, open_flags, &node)) != 0) {  //调用vfs_open，使用了VFS的接口，打开文件
         fd_array_free(file);
         return ret;
     }
@@ -210,23 +210,23 @@ file_read(int fd, void *base, size_t len, size_t *copied_store) {
     int ret;
     struct file *file;
     *copied_store = 0;
-    if ((ret = fd2file(fd, &file)) != 0) {
+    if ((ret = fd2file(fd, &file)) != 0) {  //根据fd找到对应的file结构，并检查是否可读
         return ret;
     }
     if (!file->readable) {
         return -E_INVAL;
     }
-    fd_array_acquire(file);
+    fd_array_acquire(file); //使打开的文件计数加1
 
     struct iobuf __iob, *iob = iobuf_init(&__iob, base, len, file->pos);
-    ret = vop_read(file->node, iob);
+    ret = vop_read(file->node, iob);  //将文件内容读取到iob，实际上是sfs_read
 
-    size_t copied = iobuf_used(iob);
+    size_t copied = iobuf_used(iob);  //实际读到的字节数
     if (file->status == FD_OPENED) {
-        file->pos += copied;
+        file->pos += copied;  //调整文件指针偏移量pos的值
     }
     *copied_store = copied;
-    fd_array_release(file);
+    fd_array_release(file);  //打开的文件计数减1
     return ret;
 }
 

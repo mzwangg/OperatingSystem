@@ -43,7 +43,7 @@ kern_init(void) {
     
     ide_init();                 // init ide devices
     swap_init();                // init swap
-    fs_init();
+    fs_init();              //文件系统初始化
 
     clock_init();               // init clock interrupt
     intr_enable();              // enable irq interrupt

@@ -10,9 +10,9 @@
 //called when init_main proc start
 void
 fs_init(void) {
-    vfs_init();
-    dev_init();
-    sfs_init();
+    vfs_init();   //虚拟文件系统初始化函数
+    dev_init();   //与文件相关的设备初始化函数，比如键盘、串口、磁盘等
+    sfs_init();  //Simple FS文件系统的初始化函数
 }
 
 void

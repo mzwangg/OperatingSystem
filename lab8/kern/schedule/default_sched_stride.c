@@ -8,7 +8,7 @@
 
 /* You should define the BigStride constant here*/
 /* LAB6: YOUR CODE */
-#define BIG_STRIDE   /* you should give a value, and is ??? */
+#define BIG_STRIDE  0x7FFFFFFF /* you should give a value, and is ??? */
 
 /* The compare function for two skew_heap_node_t's and the
  * corresponding procs*/
@@ -41,6 +41,9 @@ stride_init(struct run_queue *rq) {
       * (2) init the run pool: rq->lab6_run_pool
       * (3) set number of process: rq->proc_num to 0       
       */
+     list_init(&(rq->run_list)); //初始化进程链表
+     rq->lab6_run_pool = NULL;
+     rq->proc_num = 0;
 
 }
 
@@ -58,8 +61,8 @@ stride_init(struct run_queue *rq) {
  * queue structures.
  */
 static void
-stride_enqueue(struct run_queue *rq, struct proc_struct *proc) {
-     /*LAB6: YOUR CODE 
+stride_enqueue(struct run_queue *rq, struct proc_struct *proc) {  //实现进程proc的插入运行队列
+     /*LAB6: YOUR CODE  
       * (1) insert the proc into rq correctly
       * NOTICE: you can use skew_heap or list. Important functions
       *         skew_heap_insert: insert a entry into skew_heap
@@ -68,6 +71,18 @@ stride_enqueue(struct run_queue *rq, struct proc_struct *proc) {
       * (3) set proc->rq pointer to rq
       * (4) increase rq->proc_num
       */
+#if USE_SKEW_HEAP
+     rq->lab6_run_pool =   //将新的进程插入运行队列中
+          skew_heap_insert(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
+#else
+     assert(list_empty(&(proc->run_link)));
+     list_add_before(&(rq->run_list), &(proc->run_link));
+#endif
+     if (proc->time_slice == 0 || proc->time_slice > rq->max_time_slice) {
+          proc->time_slice = rq->max_time_slice;
+     }
+     proc->rq = rq;  //更新运行队列
+     rq->proc_num ++;  //进程数加1
 
 }
 
@@ -80,13 +95,21 @@ stride_enqueue(struct run_queue *rq, struct proc_struct *proc) {
  * queue structures.
  */
 static void
-stride_dequeue(struct run_queue *rq, struct proc_struct *proc) {
+stride_dequeue(struct run_queue *rq, struct proc_struct *proc) {  //进程proc从运行队列删除
      /*  LAB6: YOUR CODE 
       * (1) remove the proc from rq correctly
       * NOTICE: you can use skew_heap or list. Important functions
       *         skew_heap_remove: remove a entry from skew_heap
       *         list_del_init: remove a entry from the  list
       */
+#if USE_SKEW_HEAP
+     rq->lab6_run_pool =  //从队列中删除指定进程
+          skew_heap_remove(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
+#else
+     assert(!list_empty(&(proc->run_link)) && proc->rq == rq);
+     list_del_init(&(proc->run_link));
+#endif
+     rq->proc_num --;   //进程数减1
  
 }
 /*
@@ -103,7 +126,7 @@ stride_dequeue(struct run_queue *rq, struct proc_struct *proc) {
  * queue structures.
  */
 static struct proc_struct *
-stride_pick_next(struct run_queue *rq) {
+stride_pick_next(struct run_queue *rq) {  //扫描整个队列，返回stride最小的进程，并更新对应的stride值
      /*  LAB6: YOUR CODE 
       * (1) get a  proc_struct pointer p  with the minimum value of stride
              (1.1) If using skew_heap, we can use le2proc get the p from rq->lab6_run_poll
@@ -111,7 +134,29 @@ stride_pick_next(struct run_queue *rq) {
       * (2) update p;s stride value: p->lab6_stride
       * (3) return p
       */
-   
+#if USE_SKEW_HEAP
+     if (rq->lab6_run_pool == NULL) return NULL;
+     struct proc_struct *p = le2proc(rq->lab6_run_pool, lab6_run_pool);  //斜堆中选择stride最小的进程
+#else
+     list_entry_t *le = list_next(&(rq->run_list));
+
+     if (le == &rq->run_list)
+          return NULL;
+     
+     struct proc_struct *p = le2proc(le, run_link);
+     le = list_next(le);
+     while (le != &rq->run_list)  //遍历链表，查找stride最小的进程
+     {
+          struct proc_struct *q = le2proc(le, run_link);
+          if ((int32_t)(p->lab6_stride - q->lab6_stride) > 0)
+               p = q;
+          le = list_next(le);
+     }
+#endif
+     if (p->lab6_priority == 0)  //优先级为0，设置为最大stride
+          p->lab6_stride += BIG_STRIDE;
+     else p->lab6_stride += BIG_STRIDE / p->lab6_priority;  
+     return p;
 }
 
 /*
@@ -123,8 +168,14 @@ stride_pick_next(struct run_queue *rq) {
  * switching.
  */
 static void
-stride_proc_tick(struct run_queue *rq, struct proc_struct *proc) {
+stride_proc_tick(struct run_queue *rq, struct proc_struct *proc) {  //检测当前进程分配的时间片是否用完，如果用完进程切换
      /* LAB6: YOUR CODE */
+     if (proc->time_slice > 0) {  //时间片还未用完，
+          proc->time_slice --;
+     }
+     if (proc->time_slice == 0) { //时间片用完，设置进程切换标志，need_resched为1
+          proc->need_resched = 1;
+     }
 }
 
 struct sched_class default_sched_class = {

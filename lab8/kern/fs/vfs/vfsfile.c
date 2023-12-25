@@ -9,7 +9,7 @@
 
 // open file in vfs, get/create inode for file with filename path.
 int
-vfs_open(char *path, uint32_t open_flags, struct inode **node_store) {
+vfs_open(char *path, uint32_t open_flags, struct inode **node_store) {  //根据path指出的文件，找到对应的基于inode的VFS索引节点
     bool can_write = 0;
     switch (open_flags & O_ACCMODE) {
     case O_RDONLY:
@@ -32,7 +32,7 @@ vfs_open(char *path, uint32_t open_flags, struct inode **node_store) {
     struct inode *node;
     bool excl = (open_flags & O_EXCL) != 0;
     bool create = (open_flags & O_CREAT) != 0;
-    ret = vfs_lookup(path, &node);
+    ret = vfs_lookup(path, &node);  //找到path对应文件的inode
 
     if (ret != 0) {
         if (ret == -16 && (create)) {
@@ -48,7 +48,7 @@ vfs_open(char *path, uint32_t open_flags, struct inode **node_store) {
     }
     assert(node != NULL);
     
-    if ((ret = vop_open(node, open_flags)) != 0) {
+    if ((ret = vop_open(node, open_flags)) != 0) {  //调用vop-open函数打开文件
         vop_ref_dec(node);
         return ret;
     }

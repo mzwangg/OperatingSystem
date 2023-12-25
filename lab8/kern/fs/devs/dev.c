@@ -128,7 +128,7 @@ dev_lookup(struct inode *node, char *path, struct inode **node_store) {
 /*
  * Function table for device inodes.
  */
-static const struct inode_ops dev_node_ops = {
+static const struct inode_ops dev_node_ops = {   //设备接口
     .vop_magic                      = VOP_MAGIC,
     .vop_open                       = dev_open,
     .vop_close                      = dev_close,
@@ -149,10 +149,10 @@ static const struct inode_ops dev_node_ops = {
 
 /* dev_init - Initialization functions for builtin vfs-level devices. */
 void
-dev_init(void) {
+dev_init(void) {   
    // init_device(null);
-    init_device(stdin);
-    init_device(stdout);
+    init_device(stdin);     //对具体设备的初始化，stdin、stdout、disk0
+    init_device(stdout);    //把它们抽象成一个设备文件，并建立对应的 inode 数据结构，最后把它们链入到 vdev_list 中。
     init_device(disk0);
 }
 /* dev_create_inode - Create inode for a vfs-level device. */
